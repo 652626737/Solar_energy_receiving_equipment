@@ -1,11 +1,11 @@
 #include <WiFi.h>
 #include <Arduino.h>
 #include <PxMatrix.h>
+#include <HTTPClient.h>
 #include "JsonParser.h"
 #include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include <HTTPClient.h>
 #include "WiFiSTAClient.h"
 
 const char *sta_ssid = "ESP32_AP";
@@ -44,8 +44,7 @@ PxMATRIX display(64, 64, P_LAT, P_OE, P_A, P_B, P_C, P_D); // 根据实际连接
 
 String lastReceivedData;
 
-void IRAM_ATTR
-display_updater()
+void IRAM_ATTR display_updater()
 {
     // Increment the counter and set the time of ISR
     portENTER_CRITICAL_ISR(&timerMux);
@@ -82,72 +81,69 @@ void display_Main()
     {
         display.fillRect(0, 62, 2, 2, display.color565(0, 0, 0));
     }
-    if (NowReceivedData != lastReceivedData && NowReceivedData != "HEARTBEAT")
+
+    JsonParser parser(NowReceivedData);
+    if (parser.parse())
     {
+        Serial.print("Indoor Sensor: ");
+        Serial.println(parser.getIndoorSensor());
+        Serial.print("Outdoor Sensor: ");
+        Serial.println(parser.getOutdoorSensor());
+        Serial.print("Water Heater Sensor: ");
+        Serial.println(parser.getWaterHeaterSensor());
+        Serial.print("Water Level Monitor: ");
+        Serial.println(parser.getWaterLevelMonitor());
+        display.clearDisplay();
+        display.setTextSize(0);
+        display.setRotation(0);
+        display.setTextColor(display.color565(255, 0, 0));
+        // display.setCursor(0, 20);
+        // display.println(parser.getIndoorSensor());
+        display.setCursor(15, 56);
+        display.println(parser.getOutdoorSensor());
+        display.setTextSize(2);
+        display.setCursor(20, 25);
+        display.println(parser.getWaterHeaterSensor());
 
-        JsonParser parser(NowReceivedData);
-        if (parser.parse())
+        if (parser.getWaterLevelMonitor() >= 100)
+
         {
-            Serial.print("Indoor Sensor: ");
-            Serial.println(parser.getIndoorSensor());
-            Serial.print("Outdoor Sensor: ");
-            Serial.println(parser.getOutdoorSensor());
-            Serial.print("Water Heater Sensor: ");
-            Serial.println(parser.getWaterHeaterSensor());
-            Serial.print("Water Level Monitor: ");
-            Serial.println(parser.getWaterLevelMonitor());
-            display.clearDisplay();
-            display.setTextSize(0);
-            display.setRotation(0);
-            display.setTextColor(display.color565(255, 0, 0));
-            // display.setCursor(0, 20);
-            // display.println(parser.getIndoorSensor());
-            display.setCursor(15, 56);
-            display.println(parser.getOutdoorSensor());
-            display.setTextSize(2);
-            display.setCursor(20, 25);
-            display.println(parser.getWaterHeaterSensor());
-
-            if (parser.getWaterLevelMonitor() >= 100)
-
-            {
-                display.drawRect(0, 0, 64, 5, display.color565(255, 255, 255));
-                display.fillRect(0, 0, 64, 5, display.color565(0, 255, 0));
-            }
-            else if (
-                parser.getWaterLevelMonitor() >= 80 &&
-                parser.getWaterLevelMonitor() < 100)
-            {
-                display.drawRect(0, 0, 64, 5, display.color565(255, 255, 255));
-                display.fillRect(0, 0, 48, 5, display.color565(0, 255, 0));
-            }
-            else if (
-                parser.getWaterLevelMonitor() >= 50 &&
-                parser.getWaterLevelMonitor() < 80)
-            {
-                display.drawRect(0, 0, 64, 5, display.color565(255, 255, 255));
-                display.fillRect(0, 0, 32, 5, display.color565(0, 255, 0));
-            }
-            else if (
-                parser.getWaterLevelMonitor() >= 20 &&
-                parser.getWaterLevelMonitor() < 50)
-            {
-                display.drawRect(0, 0, 64, 5, display.color565(255, 255, 255));
-                display.fillRect(0, 0, 10, 5, display.color565(255, 0, 0));
-            }
-            else if (
-                parser.getWaterLevelMonitor() >= 0 &&
-                parser.getWaterLevelMonitor() < 20)
-            {
-                display.drawRect(0, 0, 64, 5, display.color565(255, 0, 0));
-                display.fillRect(0, 0, 10, 5, display.color565(255, 0, 0));
-            }
-            lastReceivedData = NowReceivedData;
+            display.drawRect(0, 0, 64, 5, display.color565(255, 255, 255));
+            display.fillRect(0, 0, 64, 5, display.color565(0, 255, 0));
         }
-        else
+        else if (
+            parser.getWaterLevelMonitor() >= 80 &&
+            parser.getWaterLevelMonitor() < 100)
         {
-            Serial.println("Failed to parse JSON.");
+            display.drawRect(0, 0, 64, 5, display.color565(255, 255, 255));
+            display.fillRect(0, 0, 48, 5, display.color565(0, 255, 0));
         }
+        else if (
+            parser.getWaterLevelMonitor() >= 50 &&
+            parser.getWaterLevelMonitor() < 80)
+        {
+            display.drawRect(0, 0, 64, 5, display.color565(255, 255, 255));
+            display.fillRect(0, 0, 32, 5, display.color565(0, 255, 0));
+        }
+        else if (
+            parser.getWaterLevelMonitor() >= 20 &&
+            parser.getWaterLevelMonitor() < 50)
+        {
+            display.drawRect(0, 0, 64, 5, display.color565(255, 255, 255));
+            display.fillRect(0, 0, 10, 5, display.color565(255, 0, 0));
+        }
+        else if (
+            parser.getWaterLevelMonitor() >= 0 &&
+            parser.getWaterLevelMonitor() < 20)
+        {
+            display.drawRect(0, 0, 64, 5, display.color565(255, 0, 0));
+            display.fillRect(0, 0, 10, 5, display.color565(255, 0, 0));
+        }
+        lastReceivedData = NowReceivedData;
+    }
+    else
+    {
+        Serial.println("Failed to parse JSON.");
     }
 }
 
@@ -202,7 +198,8 @@ void UpdateLastReceivedData()
         // 结束HTTP请求
         http.end();
     }
-    else{
+    else
+    {
         Client.begin();
     }
 }
